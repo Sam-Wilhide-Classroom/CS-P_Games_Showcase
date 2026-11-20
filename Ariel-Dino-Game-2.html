@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAPLAY Student Game</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #19192d; height: 100%; overflow: hidden; }
+  canvas { display: block; }
+  #fallback { color: #fff; font-family: sans-serif; display: none; padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+<div id="fallback">KAPLAY could not load. This page needs an internet connection.<br>Host it online (e.g. GitHub Pages) and it will work.</div>
+<script>
+window.addEventListener('error', function(){ var f=document.getElementById('fallback'); if(f && typeof kaplay==='undefined'){ f.style.display='block'; } });
+function checkKaplay(){ if (typeof kaplay === 'undefined'){ document.getElementById('fallback').style.display='block'; } }
+</script>
+<script src="https://unpkg.com/kaplay@4000.0.0-alpha.27.1/dist/kaplay.js" onload="checkKaplay()" onerror="checkKaplay()"></script>
+<script>
+// Name Ariel Tipan 
+// Name to mi work: the emergence of the aura monster
+
+kaplay({
+    width: 900,
+    height: 450,
+    background: "#19192d",
+    letterbox: true,
+});
+
+loadBean();
+
+let spriteActual = "bean";
+let contadorSkins = 0;
+let mejorRecord = 0;
+
+// --- CAMBIA ESTE NÚMERO SI LO QUIERES AÚN MÁS GRANDE O MÁS CHICO ---
+const TAMANO_SKIN = 55; 
+const VELOCIDAD_JUEGO = 540; // Sube este número si lo quieres aún más rápido
+
+const inputArchivo = document.createElement("input");
+inputArchivo.type = "file";
+inputArchivo.accept = "image/*";
+inputArchivo.style.display = "none";
+document.body.appendChild(inputArchivo);
+
+function ajustarTamano(p) {
+    if (spriteActual === "bean") {
+        p.scale = vec2(1);
+        return;
+    }
+    if (p.width > 0 && p.height > 0) {
+        const esc = TAMANO_SKIN / Math.max(p.width, p.height);
+        p.scale = vec2(esc);
+    }
+}
+
+inputArchivo.addEventListener("change", (evento) => {
+    const archivos = evento.target.files;
+    if (!archivos || archivos.length === 0) return;
+
+    const lector = new FileReader();
+    lector.onload = (e) => {
+        contadorSkins++;
+        const nombre = "skin_" + contadorSkins;
+        loadSprite(nombre, e.target.result).then(() => {
+            spriteActual = nombre;
+            const jugadores = get("player");
+            if (jugadores.length > 0) {
+                const p = jugadores.at(0);
+                p.use(sprite(spriteActual));
+                ajustarTamano(p);
+                wait(0.05, () => ajustarTamano(p));
+            }
+        });
+    };
+    lector.readAsDataURL(archivos.item(0));
+});
+
+scene("juego", () => {
+    setGravity(2600); // Gravedad rápida estilo Geometry Dash
+
+    const pisoY = height() - 70;
+    let distancia = 0;
+    let ultimoX = 650;
+
+    // Piso continuo infinito que sigue al jugador
+    const suelo = add([
+        rect(width() * 3, 70),
+        pos(-200, pisoY),
+        area(),
+        body({ isStatic: true }),
+        color(60, 80, 200),
+        "suelo",
+    ]);
+
+    // Línea brillante superior del suelo
+    const lineaSuelo = add([
+        rect(width() * 3, 4),
+        pos(-200, pisoY),
+        color(120, 200, 255),
+    ]);
+
+    // Función para generar obstáculos estilo Geometry Dash
+    function generarObstaculo(x) {
+        const tipo = choose(["pincho", "doble_pincho", "bloque_y_pincho", "plataforma_alta"]);
+
+        if (tipo === "pincho") {
+            add([
+                polygon([vec2(0, 42), vec2(21, 0), vec2(42, 42)]),
+                pos(x, pisoY - 42),
+                area({ scale: 0.75 }),
+                color(255, 65, 85),
+                "peligro",
+                "objeto",
+            ]);
+            return rand(280, 380);
+        } 
+        
+        if (tipo === "doble_pincho") {
+            for (let i = 0; i < 2; i++) {
+                add([
+                    polygon([vec2(0, 42), vec2(21, 0), vec2(42, 42)]),
+                    pos(x + i * 42, pisoY - 42),
+                    area({ scale: 0.75 }),
+                    color(255, 65, 85),
+                    "peligro",
+                    "objeto",
+                ]);
+            }
+            return rand(340, 440);
+        }
+
+        if (tipo === "bloque_y_pincho") {
+            // Bloque sólido al que puedes subirte
+            add([
+                rect(110, 55, { radius: 4 }),
+                pos(x, pisoY - 55),
+                area(),
+                body({ isStatic: true }),
+                color(90, 210, 140),
+                "bloque",
+                "objeto",
+            ]);
+            // Pincho justo después del bloque
+            add([
+                polygon([vec2(0, 42), vec2(21, 0), vec2(42, 42)]),
+                pos(x + 115, pisoY - 42),
+                area({ scale: 0.75 }),
+                color(255, 65, 85),
+                "peligro",
+                "objeto",
+            ]);
+            return rand(360, 460);
+        }
+
+        if (tipo === "plataforma_alta") {
+            // Escalón bajo
+            add([
+                rect(95, 50, { radius: 4 }),
+                pos(x, pisoY - 50),
+                area(),
+                body({ isStatic: true }),
+                color(90, 210, 140),
+                "bloque",
+                "objeto",
+            ]);
+            // Segundo escalón más alto con pinchos abajo
+            add([
+                rect(130, 105, { radius: 4 }),
+                pos(x + 150, pisoY - 105),
+                area(),
+                body({ isStatic: true }),
+                color(100, 180, 255),
+                "bloque",
+                "objeto",
+            ]);
+            return rand(430, 520);
+        }
+    }
+
+    // Generar los primeros obstáculos
+    for (let i = 0; i < 12; i++) {
+        ultimoX += generarObstaculo(ultimoX);
+    }
+
+    const player = add([
+        sprite(spriteActual),
+        pos(150, pisoY - 40),
+        anchor("center"),
+        rotate(0),
+        area(),
+        body(),
+        "player",
+    ]);
+
+    ajustarTamano(player);
+    wait(0.05, () => ajustarTamano(player));
+
+    function saltar() {
+        if (player.isGrounded()) {
+            player.jump(860);
+        }
+    }
+
+    // Controles de salto (Teclado o Clic/Toque en pantalla)
+    onKeyPress(["space", "up", "w"], saltar);
+    onMousePress(saltar);
+
+    // Chocar con un pincho = Game Over
+    player.onCollide("peligro", () => {
+        if (distancia > mejorRecord) mejorRecord = distancia;
+        go("gameover", distancia);
+    });
+
+    // Chocar de frente contra la pared de un bloque = Game Over
+    player.onCollide("bloque", (b, col) => {
+        if (col && col.isRight()) {
+            if (distancia > mejorRecord) mejorRecord = distancia;
+            go("gameover", distancia);
+        }
+    });
+
+    player.onUpdate(() => {
+        // Movimiento automático rápido hacia la derecha
+        player.move(VELOCIDAD_JUEGO, 0);
+
+        // Rotación estilo Geometry Dash cuando está en el aire
+        if (!player.isGrounded()) {
+            player.angle += 360 * dt();
+        } else {
+            // Alinear ángulo al tocar el suelo
+            player.angle = Math.round(player.angle / 90) * 90;
+        }
+
+        // La cámara sigue al jugador hacia la derecha
+        camPos(player.pos.x + 250, height() / 2);
+
+        // Mantener el suelo siempre debajo del jugador
+        suelo.pos.x = player.pos.x - 400;
+        lineaSuelo.pos.x = player.pos.x - 400;
+
+        // Calcular metros recorridos
+        distancia = Math.floor((player.pos.x - 150) / 35);
+
+        // Generar nuevos obstáculos adelante
+        while (ultimoX < player.pos.x + width() * 1.5) {
+            ultimoX += generarObstaculo(ultimoX);
+        }
+
+        // Eliminar obstáculos que ya quedaron atrás
+        get("objeto").forEach((obj) => {
+            if (obj.pos.x < player.pos.x - 400) {
+                destroy(obj);
+            }
+        });
+    });
+
+    onKeyPress("c", () => {
+        inputArchivo.click();
+    });
+
+    const txtPuntos = add([
+        text("Distancia: 0m", { size: 24 }),
+        pos(20, 20),
+        fixed(),
+        z(100),
+    ]);
+
+    txtPuntos.onUpdate(() => {
+        txtPuntos.text = "Distancia: " + distancia + "m";
+    });
+
+    const btnSkin = add([
+        rect(175, 36, { radius: 8 }),
+        pos(width() - 195, 16),
+        color(80, 90, 220),
+        area(),
+        fixed(),
+        z(100),
+    ]);
+
+    btnSkin.add([
+        text("Cambiar Skin (C)", { size: 15 }),
+        pos(14, 10),
+    ]);
+
+    btnSkin.onClick(() => {
+        inputArchivo.click();
+    });
+});
+
+scene("gameover", (pts) => {
+    add([
+        text("¡TE ESTRELLASTE!", { size: 42 }),
+        pos(width() / 2, height() / 2 - 95),
+        anchor("center"),
+        color(255, 75, 75),
+    ]);
+
+    add([
+        text("Avanzaste: " + pts + " metros", { size: 28 }),
+        pos(width() / 2, height() / 2 - 25),
+        anchor("center"),
+        color(255, 255, 255),
+    ]);
+
+    add([
+        text("Mejor récord: " + mejorRecord + "m", { size: 22 }),
+        pos(width() / 2, height() / 2 + 25),
+        anchor("center"),
+        color(80, 140, 255),
+    ]);
+
+    add([
+        text("Presiona ESPACIO o haz CLIC para reintentar", { size: 18 }),
+        pos(width() / 2, height() / 2 + 85),
+        anchor("center"),
+        color(180, 180, 180),
+    ]);
+
+    onKeyPress(["space", "enter"], () => {
+        go("juego");
+    });
+
+    onClick(() => {
+        go("juego");
+    });
+});
+
+go("juego");
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAPLAY Student Game</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #19192d; height: 100%; overflow: hidden; }
+  canvas { display: block; }
+  #fallback { color: #fff; font-family: sans-serif; display: none; padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+<div id="fallback">KAPLAY could not load. This page needs an internet connection.<br>Host it online (e.g. GitHub Pages) and it will work.</div>
+<script>
+window.addEventListener('error', function(){ var f=document.getElementById('fallback'); if(f && typeof kaplay==='undefined'){ f.style.display='block'; } });
+function checkKaplay(){ if (typeof kaplay === 'undefined'){ document.getElementById('fallback').style.display='block'; } }
+</script>
+<script src="https://unpkg.com/kaplay@4000.0.0-alpha.27.1/dist/kaplay.js" onload="checkKaplay()" onerror="checkKaplay()"></script>
+<script>
+kaplay({
+    width: 450,
+    height: 800,
+    background: "#19192d",
+    letterbox: true,
+});
+
+loadBean();
+
+let spriteActual = "bean";
+let contadorSkins = 0;
+let mejorRecord = 0;
+
+// --- CAMBIA ESTE NÚMERO SI LO QUIERES AÚN MÁS GRANDE O MÁS CHICO ---
+const TAMANO_SKIN = 85; 
+
+const inputArchivo = document.createElement("input");
+inputArchivo.type = "file";
+inputArchivo.accept = "image/*";
+inputArchivo.style.display = "none";
+document.body.appendChild(inputArchivo);
+
+function ajustarTamano(p) {
+    if (spriteActual === "bean") {
+        p.scale = vec2(1.2);
+        return;
+    }
+    if (p.width > 0 && p.height > 0) {
+        const esc = TAMANO_SKIN / Math.max(p.width, p.height);
+        p.scale = vec2(esc);
+    }
+}
+
+inputArchivo.addEventListener("change", (evento) => {
+    const archivos = evento.target.files;
+    if (!archivos || archivos.length === 0) return;
+
+    const lector = new FileReader();
+    lector.onload = (e) => {
+        contadorSkins++;
+        const nombre = "skin_" + contadorSkins;
+        loadSprite(nombre, e.target.result).then(() => {
+            spriteActual = nombre;
+            const jugadores = get("player");
+            if (jugadores.length > 0) {
+                const p = jugadores.at(0);
+                p.use(sprite(spriteActual));
+                ajustarTamano(p);
+                wait(0.05, () => ajustarTamano(p));
+            }
+        });
+    };
+    lector.readAsDataURL(archivos.item(0));
+});
+
+scene("juego", () => {
+    setGravity(1800);
+
+    let alturaMax = 0;
+    let ultimaY = height() - 80;
+    let camY = height() / 2;
+
+    // Suelo inicial
+    add([
+        rect(width(), 40),
+        pos(0, height() - 40),
+        area(),
+        body({ isStatic: true }),
+        color(100, 220, 120),
+        "plataforma",
+    ]);
+
+    function crearPlat(y) {
+        const ancho = rand(105, 165);
+        const x = rand(20, width() - ancho - 20);
+        const movil = chance(0.25);
+
+        const plat = add([
+            rect(ancho, 20, { radius: 6 }),
+            pos(x, y),
+            area(),
+            body({ isStatic: true }),
+            color(movil ? rgb(255, 180, 70) : rgb(100, 200, 255)),
+            "plataforma",
+            {
+                dirP: choose([-1, 1]),
+                velP: rand(80, 150),
+            }
+        ]);
+
+        if (movil) {
+            plat.onUpdate(() => {
+                plat.move(plat.dirP * plat.velP, 0);
+                if (plat.pos.x <= 10 || plat.pos.x + ancho >= width() - 10) {
+                    plat.dirP *= -1;
+                }
+            });
+        }
+    }
+
+    for (let i = 0; i < 18; i++) {
+        ultimaY -= rand(85, 125);
+        crearPlat(ultimaY);
+    }
+
+    const player = add([
+        sprite(spriteActual),
+        pos(width() / 2, height() - 120),
+        anchor("center"),
+        area(),
+        body(),
+        "player",
+    ]);
+
+    ajustarTamano(player);
+    wait(0.05, () => ajustarTamano(player));
+
+    onKeyDown(["left", "a"], () => {
+        player.move(-400, 0);
+        player.flipX = true;
+    });
+
+    onKeyDown(["right", "d"], () => {
+        player.move(400, 0);
+        player.flipX = false;
+    });
+
+    onKeyPress(["space", "up", "w"], () => {
+        if (player.isGrounded()) {
+            player.jump(960);
+        }
+    });
+
+    player.onUpdate(() => {
+        if (player.pos.x < 0) player.pos.x = width();
+        if (player.pos.x > width()) player.pos.x = 0;
+
+        if (player.pos.y < camY) {
+            camY = player.pos.y;
+        }
+        camPos(width() / 2, camY);
+
+        const m = Math.floor((height() - 120 - camY) / 20);
+        if (m > alturaMax) alturaMax = m;
+
+        while (ultimaY > camY - height()) {
+            ultimaY -= rand(85, 125);
+            crearPlat(ultimaY);
+        }
+
+        get("plataforma").forEach((p) => {
+            if (p.pos.y > camY + height() / 2 + 80) {
+                destroy(p);
+            }
+        });
+
+        // Muerte instantánea al caer al vacío
+        if (player.pos.y > camY + height() / 2 + 20) {
+            if (alturaMax > mejorRecord) {
+                mejorRecord = alturaMax;
+            }
+            go("gameover", alturaMax);
+        }
+    });
+
+    onKeyPress("c", () => {
+        inputArchivo.click();
+    });
+
+    const txtPuntos = add([
+        text("Altura: 0m", { size: 24 }),
+        pos(20, 20),
+        fixed(),
+        z(100),
+    ]);
+
+    txtPuntos.onUpdate(() => {
+        txtPuntos.text = "Altura: " + alturaMax + "m";
+    });
+
+    const btnSkin = add([
+        rect(175, 36, { radius: 8 }),
+        pos(width() - 195, 16),
+        color(80, 90, 220),
+        area(),
+        fixed(),
+        z(100),
+    ]);
+
+    btnSkin.add([
+        text("Cambiar Skin (C)", { size: 15 }),
+        pos(14, 10),
+    ]);
+
+    btnSkin.onClick(() => {
+        inputArchivo.click();
+    });
+});
+
+scene("gameover", (pts) => {
+    add([
+        text("¡CAÍSTE AL VACÍO!", { size: 38 }),
+        pos(width() / 2, height() / 2 - 110),
+        anchor("center"),
+        color(255, 90, 90),
+    ]);
+
+    add([
+        text("Llegaste a: " + pts + " metros", { size: 28 }),
+        pos(width() / 2, height() / 2 - 35),
+        anchor("center"),
+        color(255, 255, 255),
+    ]);
+
+    add([
+        text("Mejor récord: " + mejorRecord + "m", { size: 22 }),
+        pos(width() / 2, height() / 2 + 15),
+        anchor("center"),
+        color(80, 115, 255),
+    ]);
+
+    add([
+        text("Presiona ESPACIO o haz CLIC", { size: 18 }),
+        pos(width() / 2, height() / 2 + 85),
+        anchor("center"),
+        color(180, 180, 180),
+    ]);
+
+    add([
+        text("para volver a empezar", { size: 18 }),
+        pos(width() / 2, height() / 2 + 110),
+        anchor("center"),
+        color(180, 180, 180),
+    ]);
+
+    onKeyPress(["space", "enter"], () => {
+        go("juego");
+    });
+
+    onClick(() => {
+        go("juego");
+    });
+});
+
+go("juego");
+
+
+</script>
+</body>
+</html>

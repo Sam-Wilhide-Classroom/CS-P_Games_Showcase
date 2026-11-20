@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAPLAY Student Game</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #19192d; height: 100%; overflow: hidden; }
+  canvas { display: block; }
+  #fallback { color: #fff; font-family: sans-serif; display: none; padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+<div id="fallback">KAPLAY could not load. This page needs an internet connection.<br>Host it online (e.g. GitHub Pages) and it will work.</div>
+<script>
+window.addEventListener('error', function(){ var f=document.getElementById('fallback'); if(f && typeof kaplay==='undefined'){ f.style.display='block'; } });
+function checkKaplay(){ if (typeof kaplay === 'undefined'){ document.getElementById('fallback').style.display='block'; } }
+</script>
+<script src="https://unpkg.com/kaplay@4000.0.0-alpha.27.1/dist/kaplay.js" onload="checkKaplay()" onerror="checkKaplay()"></script>
+<script>
+//Musab
+//Tutorial #1  KAPLAY create your first game.
+
+//5 comments near changes you made in the code and explanations (what, how, why)
+//
+//
+//
+//
+
+kaplay();
+
+loadSprite("pixilart-drawing", "data:image/png;base64,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");
+// why i changed the character is because the orgianl one is quite boring
+const obj = add([
+    sprite("pixilart-drawing"),
+    pos(200, 100),
+    rotate(3),
+    anchor("center"),// this keeps my characters spin pattern in the middle
+    {
+        dir: vec2(0, 0),
+        speed: 1200, // 
+    },
+]);
+
+
+obj.onUpdate(() => {
+    obj.angle = obj.angle + 100 * dt();
+});
+
+
+obj.onUpdate(() => {
+    obj.dir.x = 0;
+    obj.dir.y = 0;
+
+    if (isKeyDown("a")) obj.dir.x = -1;
+    if (isKeyDown("d")) obj.dir.x = 1;
+    if (isKeyDown("w")) obj.dir.y = -1;
+    if (isKeyDown("s")) obj.dir.y = 1;
+    if (isKeyDown("left")) obj.dir.x = -1;
+    if (isKeyDown("right")) obj.dir.x = 1;
+    if (isKeyDown("up")) obj.dir.y = -1;
+    if (isKeyDown("down")) obj.dir.y = 1;
+
+//what i did here is that i added move then just one movement control using the if statement.
+
+    obj.move(
+        obj.dir.unit().scale(obj.speed),
+    );
+});
+// add tree
+add([
+    rect(48, 64),
+    area(),
+    body({ isStatic: true }),
+    outline(4),
+    pos(width(), height() - 48),
+    anchor("botleft"),
+    color(255, 180, 255),
+    move(LEFT, 480),
+]);
+loop(1, () => {
+    // add tree
+    add([
+        rect(48, 64),
+        area(),
+        body({ isStatic: true }),
+        outline(4),
+        pos(width(), height() - 48),
+        anchor("botleft"),
+        color(255, 180, 255),
+        move(LEFT, 480),
+        "tree", // add a tag here
+    ]);
+});
+// add platform
+add([
+    rect(width(), 48),
+    pos(0, height() - 48),
+    outline(4),
+    area(),
+    body({ isStatic: true }),
+    color(127, 200, 255),
+]);
+
+
+</script>
+</body>
+</html>
